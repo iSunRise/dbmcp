@@ -2,8 +2,11 @@
 
 A small **MCP server** that proxies SQL queries to PostgreSQL. It:
 
+- **Routes to multiple databases by name** — callers pick `devDb`, `stageDb`,
+  etc. (case-insensitive). Each can live on a different host with different
+  credentials; the caller only ever knows the name.
 - **Isolates credentials** — the caller sends SQL and gets results back; the
-  `DATABASE_URL` lives only in the server's environment and is never returned.
+  connection strings live only in the server's environment and are never returned.
 - **Enforces a hard timeout** — every query is capped (default **30s**) both by
   PostgreSQL `statement_timeout` and by an in-process backstop.
 - **Shrinks output** — the inline response is kept under **1000 characters**:
@@ -26,8 +29,24 @@ docker compose up --build   # builds the image and runs the server
 
 This starts:
 - `dbmcp` — the MCP server, mapped to host port `${HOST_PORT:-3000}`.
-- `db` — an optional local PostgreSQL for testing (host port `${DB_HOST_PORT:-5432}`).
-  Point `DATABASE_URL` at your own database to skip it.
+- `devdb`, `stagedb` — two optional local PostgreSQL servers (different users,
+  passwords, and hostnames) for testing multi-database routing. In real use,
+  delete them and point the `DB_*_URL` env vars at your actual hosts.
+
+### Configuring databases
+
+Each database is one env var following the `DB_<NAME>_URL` convention; the
+`<NAME>` becomes the case-insensitive name callers use:
+
+```bash
+DB_DEVDB_URL=postgres://devuser:devpass@dev-host:5432/dev       # -> "devDb"
+DB_STAGEDB_URL=postgres://stageuser:secret@stage-host:5432/app  # -> "stageDb"
+DB_PRODDB_URL=postgres://readonly:secret@prod-host:5432/app     # -> "prodDb"
+```
+
+Optionally set `DATABASE_URL` as the unnamed default used when a caller omits
+`database`. If exactly one database is configured, it is the default
+automatically.
 
 > Node is pinned to `node:24.16.0-alpine` (the latest published Node 24 LTS;
 > `24.17.0` is not yet on Docker Hub).
@@ -36,9 +55,12 @@ This starts:
 
 Streamable HTTP, stateless, at `POST /mcp`. One tool:
 
-| Tool    | Input            | Returns                                              |
-|---------|------------------|------------------------------------------------------|
-| `query` | `sql` (string)   | truncated preview + metadata + public CSV URL        |
+| Tool    | Input                                          | Returns                                       |
+|---------|------------------------------------------------|-----------------------------------------------|
+| `query` | `sql` (string), `database` (string, see below) | truncated preview + metadata + public CSV URL |
+
+`database` selects which configured database to run against (case-insensitive).
+It is optional when a default exists, otherwise required.
 
 Example (raw JSON-RPC over HTTP):
 
@@ -47,7 +69,7 @@ curl -s -X POST http://localhost:3000/mcp \
   -H 'Content-Type: application/json' \
   -H 'Accept: application/json, text/event-stream' \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/call",
-       "params":{"name":"query","arguments":{"sql":"SELECT * FROM demo"}}}'
+       "params":{"name":"query","arguments":{"database":"devDb","sql":"SELECT * FROM demo"}}}'
 ```
 
 Response payload (inside the MCP tool result text):
@@ -57,6 +79,7 @@ Response payload (inside the MCP tool result text):
   "columns": ["id", "big_text", "label"],
   "rows": [["1", "xxxx…", "row-1"], ...],
   "metadata": {
+    "database": "devDb",
     "totalRows": 50,
     "returnedRows": 6,
     "truncatedColumns": ["big_text"],
@@ -76,15 +99,15 @@ curl -s http://localhost:3000/files/<uuid>.csv | grep something
 
 ## Configuration (env)
 
-| Variable           | Default                                | Purpose                                   |
-|--------------------|----------------------------------------|-------------------------------------------|
-| `HOST_PORT`        | `3000`                                 | Host port mapped to the container.        |
-| `DATABASE_URL`     | `postgres://app:app@db:5432/app`       | PostgreSQL connection (server-side only). |
-| `QUERY_TIMEOUT_MS` | `30000`                                | Hard per-query timeout.                   |
-| `MAX_OUTPUT_CHARS` | `1000`                                 | Inline payload cap.                       |
-| `MAX_CELL_CHARS`   | `100`                                  | Per-cell truncation length.               |
-| `PUBLIC_BASE_URL`  | `http://localhost:3000`                | Base URL used in CSV links.               |
-| `DB_HOST_PORT`     | `5432`                                 | Host port for the bundled Postgres.       |
+| Variable           | Default                  | Purpose                                              |
+|--------------------|--------------------------|------------------------------------------------------|
+| `HOST_PORT`        | `3000`                   | Host port mapped to the container.                   |
+| `DB_<NAME>_URL`    | —                        | A named database connection (server-side only).      |
+| `DATABASE_URL`     | —                        | Optional unnamed default database.                   |
+| `QUERY_TIMEOUT_MS` | `30000`                  | Hard per-query timeout.                              |
+| `MAX_OUTPUT_CHARS` | `1000`                   | Inline payload cap.                                  |
+| `MAX_CELL_CHARS`   | `100`                    | Per-cell truncation length.                          |
+| `PUBLIC_BASE_URL`  | `http://localhost:3000`  | Base URL used in CSV links.                          |
 
 ## Security notes
 

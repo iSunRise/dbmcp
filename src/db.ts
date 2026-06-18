@@ -1,14 +1,30 @@
 import pg from "pg";
 import { config } from "./config.js";
 
-// A single shared pool. The connection string (and therefore the credentials)
-// lives only here, on the server side.
-const pool = new pg.Pool({
-  connectionString: config.databaseUrl,
-  // Give up acquiring a connection rather than hanging forever.
-  connectionTimeoutMillis: 10_000,
-  max: 10,
-});
+// One connection pool per named database, created on first use. The connection
+// strings (and therefore the credentials) live only here, on the server side.
+const pools = new Map<string, pg.Pool>();
+
+function getPool(dbName: string): pg.Pool {
+  const key = dbName.toLowerCase();
+  const connectionString = config.databases[key];
+  if (!connectionString) {
+    // Names are safe to disclose; connection strings/credentials are not.
+    throw new Error(
+      `Unknown database "${dbName}". Available: ${config.databaseNames.join(", ")}`,
+    );
+  }
+  let pool = pools.get(key);
+  if (!pool) {
+    pool = new pg.Pool({
+      connectionString,
+      connectionTimeoutMillis: 10_000,
+      max: 10,
+    });
+    pools.set(key, pool);
+  }
+  return pool;
+}
 
 export interface QueryResult {
   fields: string[];
@@ -16,14 +32,14 @@ export interface QueryResult {
 }
 
 /**
- * Run a single SQL statement with a hard timeout.
+ * Run a single SQL statement against the named database with a hard timeout.
  *
  * The timeout is enforced in two layers:
  *  1. PostgreSQL `statement_timeout` cancels the query server-side.
  *  2. A JS-level race rejects even if the connection itself stalls.
  */
-export async function runQuery(sql: string): Promise<QueryResult> {
-  const client = await pool.connect();
+export async function runQuery(dbName: string, sql: string): Promise<QueryResult> {
+  const client = await getPool(dbName).connect();
   try {
     await client.query(`SET statement_timeout = ${config.queryTimeoutMs}`);
 

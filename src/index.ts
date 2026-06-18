@@ -14,24 +14,42 @@ function buildServer(): McpServer {
     version: "1.0.0",
   });
 
+  const dbList = config.databaseNames.join(", ");
+  const databaseField = config.defaultDb
+    ? z
+        .string()
+        .optional()
+        .describe(
+          `Which database to query (case-insensitive). Available: ${dbList}. ` +
+            `Defaults to "${config.defaultDb}" if omitted.`,
+        )
+    : z
+        .string()
+        .describe(`Which database to query (case-insensitive). Available: ${dbList}.`);
+
   server.registerTool(
     "query",
     {
       title: "Run SQL query",
       description:
-        "Execute a read SQL statement against the configured PostgreSQL database. " +
-        "Returns a truncated preview (cells capped at " +
+        "Execute a read SQL statement against one of the configured PostgreSQL " +
+        `databases (${dbList}). Returns a truncated preview (cells capped at ` +
         `${config.maxCellChars} chars, payload capped at ${config.maxOutputChars} chars) ` +
         "plus metadata and a public CSV URL containing the full, untruncated result.",
       inputSchema: {
         sql: z.string().describe("The SQL statement to execute."),
+        database: databaseField,
       },
     },
-    async ({ sql }) => {
+    async ({ sql, database }) => {
       try {
-        const result = await runQuery(sql);
+        const dbName = database ?? config.defaultDb;
+        if (!dbName) {
+          throw new Error(`No database specified. Available: ${dbList}`);
+        }
+        const result = await runQuery(dbName, sql);
         const csvUrl = await writeCsv(result);
-        const preview = buildPreview(result, csvUrl);
+        const preview = buildPreview(result, dbName, csvUrl);
         return {
           content: [{ type: "text", text: JSON.stringify(preview) }],
         };
@@ -43,6 +61,26 @@ function buildServer(): McpServer {
           content: [{ type: "text", text: JSON.stringify({ error: message }) }],
         };
       }
+    },
+  );
+
+  server.registerTool(
+    "list_databases",
+    {
+      title: "List databases",
+      description:
+        "List the names of databases available to query. Returns names only — " +
+        "never hosts, users, or connection strings.",
+      inputSchema: {},
+    },
+    async () => {
+      const payload = {
+        databases: config.databaseNames,
+        default: config.defaultDb ?? null,
+      };
+      return {
+        content: [{ type: "text", text: JSON.stringify(payload) }],
+      };
     },
   );
 

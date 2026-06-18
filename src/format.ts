@@ -46,6 +46,7 @@ export interface Preview {
   columns: string[];
   rows: string[][];
   metadata: {
+    database: string;
     totalRows: number;
     returnedRows: number;
     truncatedColumns: string[];
@@ -62,7 +63,7 @@ export interface Preview {
  *  - includes only as many leading rows as fit under `maxOutputChars`,
  *  - reports total row count, which columns were truncated, and the CSV URL.
  */
-export function buildPreview(result: QueryResult, csvUrl: string): Preview {
+export function buildPreview(result: QueryResult, dbName: string, csvUrl: string): Preview {
   const { fields, rows } = result;
   const truncatedColumns = new Set<string>();
 
@@ -83,6 +84,7 @@ export function buildPreview(result: QueryResult, csvUrl: string): Preview {
     columns: fields,
     rows: [],
     metadata: {
+      database: dbName,
       totalRows: rows.length,
       returnedRows: 0,
       truncatedColumns: [...truncatedColumns],

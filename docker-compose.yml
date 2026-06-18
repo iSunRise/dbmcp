@@ -6,8 +6,11 @@ services:
       - "${HOST_PORT:-3000}:3000"
     environment:
       PORT: 3000
-      # Credentials live only in the server's environment, never exposed to callers.
-      DATABASE_URL: ${DATABASE_URL:-postgres://app:app@db:5432/app}
+      # Named databases. Each lives on its own host with its own credentials,
+      # all kept server-side and never exposed to callers. Add more with the
+      # DB_<NAME>_URL convention — callers then select by name (case-insensitive).
+      DB_DEVDB_URL: ${DB_DEVDB_URL:-postgres://devuser:devpass@devdb:5432/dev}
+      DB_STAGEDB_URL: ${DB_STAGEDB_URL:-postgres://stageuser:stagepass@stagedb:5432/stage}
       QUERY_TIMEOUT_MS: ${QUERY_TIMEOUT_MS:-30000}
       MAX_OUTPUT_CHARS: ${MAX_OUTPUT_CHARS:-1000}
       MAX_CELL_CHARS: ${MAX_CELL_CHARS:-100}
@@ -17,27 +20,37 @@ services:
     volumes:
       - csv_files:/data/files
     depends_on:
-      db:
+      devdb:
+        condition: service_healthy
+      stagedb:
         condition: service_healthy
     restart: unless-stopped
 
-  # Optional local PostgreSQL for testing. Point DATABASE_URL at your own DB to skip it.
-  db:
+  # --- Optional local PostgreSQL servers for testing multi-db routing. ---
+  # In real use, delete these and point DB_*_URL at your actual dev/stage hosts.
+  devdb:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: app
-      POSTGRES_PASSWORD: app
-      POSTGRES_DB: app
-    ports:
-      - "${DB_HOST_PORT:-5432}:5432"
-    volumes:
-      - pg_data:/var/lib/postgresql/data
+      POSTGRES_USER: devuser
+      POSTGRES_PASSWORD: devpass
+      POSTGRES_DB: dev
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U app -d app"]
+      test: ["CMD-SHELL", "pg_isready -U devuser -d dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  stagedb:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: stageuser
+      POSTGRES_PASSWORD: stagepass
+      POSTGRES_DB: stage
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U stageuser -d stage"]
       interval: 5s
       timeout: 5s
       retries: 5
 
 volumes:
   csv_files:
-  pg_data:
