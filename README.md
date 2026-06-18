@@ -28,7 +28,7 @@ docker compose up --build   # builds the image and runs the server
 ```
 
 This starts:
-- `dbmcp` — the MCP server, mapped to host port `${HOST_PORT:-3000}`.
+- `dbmcp` — the MCP server, mapped to host port `${HOST_PORT:-3991}`.
 - `devdb`, `stagedb` — two optional local PostgreSQL servers (different users,
   passwords, and hostnames) for testing multi-database routing. In real use,
   delete them and point the `DB_*_URL` env vars at your actual hosts.
@@ -66,7 +66,7 @@ It is optional when a default exists, otherwise required.
 Example (raw JSON-RPC over HTTP):
 
 ```bash
-curl -s -X POST http://localhost:3000/mcp \
+curl -s -X POST http://localhost:3991/mcp \
   -H 'Content-Type: application/json' \
   -H 'Accept: application/json, text/event-stream' \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/call",
@@ -86,7 +86,7 @@ Response payload (inside the MCP tool result text):
     "truncatedColumns": ["big_text"],
     "cellsTruncated": true,
     "rowsOmitted": true,
-    "csvUrl": "http://localhost:3000/files/<uuid>.csv",
+    "csvUrl": "http://localhost:3991/files/<uuid>.csv",
     "note": "Showing first 6 of 50 rows. Fetch <url> for the full result."
   }
 }
@@ -95,20 +95,20 @@ Response payload (inside the MCP tool result text):
 Fetch the full result:
 
 ```bash
-curl -s http://localhost:3000/files/<uuid>.csv | grep something
+curl -s http://localhost:3991/files/<uuid>.csv | grep something
 ```
 
 ## Configuration (env)
 
 | Variable           | Default                  | Purpose                                              |
 |--------------------|--------------------------|------------------------------------------------------|
-| `HOST_PORT`        | `3000`                   | Host port mapped to the container.                   |
+| `HOST_PORT`        | `3991`                   | Host port mapped to the container.                   |
 | `DB_<NAME>_URL`    | —                        | A named database connection (server-side only).      |
 | `DATABASE_URL`     | —                        | Optional unnamed default database.                   |
 | `QUERY_TIMEOUT_MS` | `30000`                  | Hard per-query timeout.                              |
 | `MAX_OUTPUT_CHARS` | `1000`                   | Inline payload cap.                                  |
 | `MAX_CELL_CHARS`   | `100`                    | Per-cell truncation length.                          |
-| `PUBLIC_BASE_URL`  | `http://localhost:3000`  | Base URL used in CSV links.                          |
+| `PUBLIC_BASE_URL`  | `http://localhost:3991`  | Base URL used in CSV links.                          |
 
 ## Security notes
 

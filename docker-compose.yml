@@ -3,9 +3,9 @@ services:
     build: .
     ports:
       # host:container — the MCP endpoint and CSV files are reachable from the host.
-      - "${HOST_PORT:-3000}:3000"
+      - "${HOST_PORT:-3991}:3991"
     environment:
-      PORT: 3000
+      PORT: 3991
       # Named databases. Each lives on its own host with its own credentials,
       # all kept server-side and never exposed to callers. Add more with the
       # DB_<NAME>_URL convention — callers then select by name (case-insensitive).
@@ -16,7 +16,7 @@ services:
       MAX_CELL_CHARS: ${MAX_CELL_CHARS:-100}
       FILES_DIR: /data/files
       # Must match how the host reaches the mapped port, so CSV URLs are fetchable.
-      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:3000}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:3991}
     volumes:
       - csv_files:/data/files
     depends_on:

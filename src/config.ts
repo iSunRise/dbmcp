@@ -42,7 +42,7 @@ const defaultDb = databases["default"]
 
 export const config = {
   // HTTP port the server listens on inside the container.
-  port: intEnv("PORT", 3000),
+  port: intEnv("PORT", 3991),
 
   // name -> connection string. Kept server-side only; never returned to callers.
   databases,
@@ -62,7 +62,7 @@ export const config = {
   filesDir: process.env.FILES_DIR ?? "/data/files",
 
   // Base URL callers use to fetch exported CSVs. Should be reachable from the host.
-  publicBaseUrl: (process.env.PUBLIC_BASE_URL ?? "http://localhost:3000").replace(/\/+$/, ""),
+  publicBaseUrl: (process.env.PUBLIC_BASE_URL ?? "http://localhost:3991").replace(/\/+$/, ""),
 };
 
 if (databaseNames.length === 0) {

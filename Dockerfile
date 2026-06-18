@@ -19,5 +19,5 @@ COPY --from=build /app/dist ./dist
 RUN mkdir -p /data/files
 ENV FILES_DIR=/data/files
 
-EXPOSE 3000
+EXPOSE 3991
 CMD ["node", "dist/index.js"]
