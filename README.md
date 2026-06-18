@@ -53,11 +53,12 @@ automatically.
 
 ## MCP endpoint
 
-Streamable HTTP, stateless, at `POST /mcp`. One tool:
+Streamable HTTP, stateless, at `POST /mcp`. Two tools:
 
-| Tool    | Input                                          | Returns                                       |
-|---------|------------------------------------------------|-----------------------------------------------|
-| `query` | `sql` (string), `database` (string, see below) | truncated preview + metadata + public CSV URL |
+| Tool             | Input                                          | Returns                                       |
+|------------------|------------------------------------------------|-----------------------------------------------|
+| `query`          | `sql` (string), `database` (string, see below) | truncated preview + metadata + public CSV URL |
+| `list_databases` | none                                           | available database names + the default (names only — never credentials) |
 
 `database` selects which configured database to run against (case-insensitive).
 It is optional when a default exists, otherwise required.
