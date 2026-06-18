@@ -1,0 +1,113 @@
+import { randomUUID } from "node:crypto";
+import { writeFile, mkdir } from "node:fs/promises";
+import path from "node:path";
+import { config } from "./config.js";
+import type { QueryResult } from "./db.js";
+
+/** Render any SQL value as a string for display / CSV output. */
+export function cellToString(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === "object") return JSON.stringify(value);
+  return String(value);
+}
+
+function csvEscape(field: string): string {
+  if (/[",\r\n]/.test(field)) {
+    return `"${field.replace(/"/g, '""')}"`;
+  }
+  return field;
+}
+
+/**
+ * Write the FULL, untruncated result set to a CSV file in the public files
+ * directory and return its caller-fetchable URL. This is the artifact callers
+ * grep against when the inline preview is truncated.
+ */
+export async function writeCsv(result: QueryResult): Promise<string> {
+  await mkdir(config.filesDir, { recursive: true });
+
+  const id = randomUUID();
+  const filename = `${id}.csv`;
+  const filePath = path.join(config.filesDir, filename);
+
+  const lines: string[] = [];
+  lines.push(result.fields.map((f) => csvEscape(f)).join(","));
+  for (const row of result.rows) {
+    lines.push(row.map((cell) => csvEscape(cellToString(cell))).join(","));
+  }
+  // Trailing newline so the file ends cleanly.
+  await writeFile(filePath, lines.join("\r\n") + "\r\n", "utf8");
+
+  return `${config.publicBaseUrl}/files/${filename}`;
+}
+
+export interface Preview {
+  columns: string[];
+  rows: string[][];
+  metadata: {
+    totalRows: number;
+    returnedRows: number;
+    truncatedColumns: string[];
+    cellsTruncated: boolean;
+    rowsOmitted: boolean;
+    csvUrl: string;
+    note: string;
+  };
+}
+
+/**
+ * Build an inline preview that:
+ *  - truncates every cell to `maxCellChars`,
+ *  - includes only as many leading rows as fit under `maxOutputChars`,
+ *  - reports total row count, which columns were truncated, and the CSV URL.
+ */
+export function buildPreview(result: QueryResult, csvUrl: string): Preview {
+  const { fields, rows } = result;
+  const truncatedColumns = new Set<string>();
+
+  // Truncate each cell, tracking which columns lost data.
+  const truncatedRows: string[][] = rows.map((row) =>
+    row.map((cell, col) => {
+      const full = cellToString(cell);
+      if (full.length > config.maxCellChars) {
+        truncatedColumns.add(fields[col]);
+        return full.slice(0, config.maxCellChars) + "…";
+      }
+      return full;
+    }),
+  );
+
+  // Add rows one at a time until the serialized payload would exceed the cap.
+  const preview: Preview = {
+    columns: fields,
+    rows: [],
+    metadata: {
+      totalRows: rows.length,
+      returnedRows: 0,
+      truncatedColumns: [...truncatedColumns],
+      cellsTruncated: truncatedColumns.size > 0,
+      rowsOmitted: false,
+      csvUrl,
+      note: "",
+    },
+  };
+
+  for (const row of truncatedRows) {
+    preview.rows.push(row);
+    preview.metadata.returnedRows = preview.rows.length;
+    if (JSON.stringify(preview).length > config.maxOutputChars) {
+      // This row pushed us over — drop it back out.
+      preview.rows.pop();
+      preview.metadata.returnedRows = preview.rows.length;
+      break;
+    }
+  }
+
+  preview.metadata.rowsOmitted = preview.metadata.returnedRows < rows.length;
+  preview.metadata.note = preview.metadata.rowsOmitted
+    ? `Showing first ${preview.metadata.returnedRows} of ${rows.length} rows. Fetch ${csvUrl} for the full result.`
+    : "Complete result shown.";
+
+  return preview;
+}

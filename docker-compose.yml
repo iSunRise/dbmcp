@@ -1,0 +1,43 @@
+services:
+  dbmcp:
+    build: .
+    ports:
+      # host:container — the MCP endpoint and CSV files are reachable from the host.
+      - "${HOST_PORT:-3000}:3000"
+    environment:
+      PORT: 3000
+      # Credentials live only in the server's environment, never exposed to callers.
+      DATABASE_URL: ${DATABASE_URL:-postgres://app:app@db:5432/app}
+      QUERY_TIMEOUT_MS: ${QUERY_TIMEOUT_MS:-30000}
+      MAX_OUTPUT_CHARS: ${MAX_OUTPUT_CHARS:-1000}
+      MAX_CELL_CHARS: ${MAX_CELL_CHARS:-100}
+      FILES_DIR: /data/files
+      # Must match how the host reaches the mapped port, so CSV URLs are fetchable.
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:3000}
+    volumes:
+      - csv_files:/data/files
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Optional local PostgreSQL for testing. Point DATABASE_URL at your own DB to skip it.
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: app
+    ports:
+      - "${DB_HOST_PORT:-5432}:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d app"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  csv_files:
+  pg_data:
