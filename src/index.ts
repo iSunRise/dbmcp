@@ -122,8 +122,8 @@ app.post("/mcp", async (req, res) => {
   }
 });
 
-app.listen(config.port, () => {
-  console.log(`dbmcp listening on port ${config.port}`);
+app.listen(config.port, config.bindHost, () => {
+  console.log(`dbmcp listening on ${config.bindHost}:${config.port}`);
   console.log(`  MCP endpoint:  POST /mcp`);
   console.log(`  CSV files:     GET  /files/<id>.csv`);
   console.log(`  Public base:   ${config.publicBaseUrl}`);

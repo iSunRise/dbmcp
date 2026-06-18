@@ -44,6 +44,11 @@ export const config = {
   // HTTP port the server listens on inside the container.
   port: intEnv("PORT", 3991),
 
+  // Interface to bind to. 0.0.0.0 accepts connections on all interfaces so the
+  // mapped port is reachable from the host and from other containers (e.g. via
+  // host.docker.internal).
+  bindHost: process.env.BIND_HOST ?? "0.0.0.0",
+
   // name -> connection string. Kept server-side only; never returned to callers.
   databases,
   databaseNames,

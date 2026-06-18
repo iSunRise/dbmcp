@@ -177,6 +177,34 @@ args = ["-y", "mcp-remote", "http://localhost:3991/mcp"]
 Once connected, call `list_databases` to see available names, then `query`
 with a `database` and `sql`.
 
+### Reaching it from another container
+
+The server binds to `0.0.0.0`, and the port is published on the host, so other
+containers can reach it via `host.docker.internal`:
+
+```bash
+curl http://host.docker.internal:3991/mcp ...
+```
+
+On Docker Desktop this name resolves automatically. On plain Linux, give the
+*calling* container the host gateway mapping:
+
+```yaml
+# in the consuming container's compose service
+extra_hosts:
+  - "host.docker.internal:host-gateway"
+```
+
+So that the exported CSV links are fetchable from those containers (rather than
+pointing back at the caller's own `localhost`), set on **this** server:
+
+```bash
+PUBLIC_BASE_URL=http://host.docker.internal:3991
+```
+
+> If the caller is part of *this* compose project, it can also just use the
+> service name directly: `http://dbmcp:3991/mcp`.
+
 ## Configuration (env)
 
 | Variable           | Default                  | Purpose                                              |
