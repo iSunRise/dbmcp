@@ -52,7 +52,9 @@ export interface Preview {
     truncatedColumns: string[];
     cellsTruncated: boolean;
     rowsOmitted: boolean;
-    csvUrl: string;
+    // Only set when the inline preview is incomplete; null when the full result
+    // is shown inline (no CSV file is written in that case).
+    csvUrl: string | null;
     note: string;
   };
 }
@@ -61,9 +63,13 @@ export interface Preview {
  * Build an inline preview that:
  *  - truncates every cell to `maxCellChars`,
  *  - includes only as many leading rows as fit under `maxOutputChars`,
- *  - reports total row count, which columns were truncated, and the CSV URL.
+ *  - reports total row count and which columns were truncated.
+ *
+ * A CSV export of the full, untruncated result is written and linked ONLY when
+ * the preview is incomplete (rows omitted or cells truncated). When everything
+ * is shown inline there is nothing the CSV would add, so none is created.
  */
-export function buildPreview(result: QueryResult, dbName: string, csvUrl: string): Preview {
+export async function buildPreview(result: QueryResult, dbName: string): Promise<Preview> {
   const { fields, rows } = result;
   const truncatedColumns = new Set<string>();
 
@@ -90,7 +96,7 @@ export function buildPreview(result: QueryResult, dbName: string, csvUrl: string
       truncatedColumns: [...truncatedColumns],
       cellsTruncated: truncatedColumns.size > 0,
       rowsOmitted: false,
-      csvUrl,
+      csvUrl: null,
       note: "",
     },
   };
@@ -107,9 +113,26 @@ export function buildPreview(result: QueryResult, dbName: string, csvUrl: string
   }
 
   preview.metadata.rowsOmitted = preview.metadata.returnedRows < rows.length;
-  preview.metadata.note = preview.metadata.rowsOmitted
-    ? `Showing first ${preview.metadata.returnedRows} of ${rows.length} rows. Fetch ${csvUrl} for the full result.`
-    : "Complete result shown.";
+
+  // The result is shown in full only when no rows were dropped and no cell was
+  // capped. Otherwise write the CSV and point the caller at it.
+  const complete = !preview.metadata.rowsOmitted && !preview.metadata.cellsTruncated;
+  if (complete) {
+    preview.metadata.note = "Complete result shown.";
+    return preview;
+  }
+
+  const csvUrl = await writeCsv(result);
+  preview.metadata.csvUrl = csvUrl;
+
+  const reasons: string[] = [];
+  if (preview.metadata.rowsOmitted) {
+    reasons.push(`showing first ${preview.metadata.returnedRows} of ${rows.length} rows`);
+  }
+  if (preview.metadata.cellsTruncated) {
+    reasons.push(`some cells truncated to ${config.maxCellChars} chars`);
+  }
+  preview.metadata.note = `Result not shown in full (${reasons.join("; ")}). The complete, untruncated result is at ${csvUrl}. This server has no tool to return that file — download it yourself with an HTTP-capable tool (e.g. run \`curl -s "${csvUrl}"\` via your shell).`;
 
   return preview;
 }

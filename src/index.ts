@@ -4,7 +4,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { z } from "zod";
 import { config } from "./config.js";
 import { runQuery } from "./db.js";
-import { buildPreview, writeCsv } from "./format.js";
+import { buildPreview } from "./format.js";
 import { log, errToObj } from "./logger.js";
 
 // Build a fresh MCP server instance. The single tool runs SQL and returns a
@@ -26,7 +26,9 @@ function buildServer(): McpServer {
         "data, then `query` with a single SELECT. Queries are intended to be " +
         "read-only — do not run INSERT/UPDATE/DELETE/DDL. Results return as a " +
         "truncated preview plus a public CSV URL with the full, untruncated " +
-        "result set; fetch that URL when you need rows beyond the preview.",
+        "result set. This server cannot return that file's contents; when you " +
+        "need rows beyond the preview, download the URL yourself with an " +
+        "HTTP-capable tool (e.g. `curl` via your shell).",
     },
   );
 
@@ -51,7 +53,11 @@ function buildServer(): McpServer {
         "Execute a read SQL statement against one of the configured PostgreSQL " +
         `databases (${dbList}). Returns a truncated preview (cells capped at ` +
         `${config.maxCellChars} chars, payload capped at ${config.maxOutputChars} chars) ` +
-        "plus metadata and a public CSV URL containing the full, untruncated result.",
+        "plus metadata. When the result is too large to show in full inline, a public " +
+        "CSV URL with the full, untruncated result is included; when the whole result " +
+        "fits inline, it is returned directly and no CSV is created. This server does " +
+        "not return file contents — to read a CSV URL, download it yourself with an " +
+        "HTTP-capable tool (e.g. `curl` via your shell).",
       inputSchema: {
         sql: z.string().describe("The SQL statement to execute."),
         database: databaseField,
@@ -64,8 +70,7 @@ function buildServer(): McpServer {
           throw new Error(`No database specified. Available: ${dbList}`);
         }
         const result = await runQuery(dbName, sql);
-        const csvUrl = await writeCsv(result);
-        const preview = buildPreview(result, dbName, csvUrl);
+        const preview = await buildPreview(result, dbName);
         log.info("query ok", {
           database: dbName,
           totalRows: preview.metadata.totalRows,
