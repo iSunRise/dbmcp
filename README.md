@@ -98,6 +98,85 @@ Fetch the full result:
 curl -s http://localhost:3991/files/<uuid>.csv | grep something
 ```
 
+## Connecting a client
+
+The server speaks **Streamable HTTP** at `http://localhost:3991/mcp`. Start it
+first (`docker compose up`), then point your client at that URL. None of the
+options below require Node on your host — they connect over HTTP directly.
+
+### Claude Code (CLI)
+
+```bash
+claude mcp add --transport http dbmcp http://localhost:3991/mcp
+claude mcp list            # should show dbmcp as connected
+```
+
+Or add it to a project's `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "dbmcp": { "type": "http", "url": "http://localhost:3991/mcp" }
+  }
+}
+```
+
+### Cursor (cursor-cli)
+
+Add the server to `~/.cursor/mcp.json` (global) or `.cursor/mcp.json` (project):
+
+```json
+{
+  "mcpServers": {
+    "dbmcp": { "url": "http://localhost:3991/mcp" }
+  }
+}
+```
+
+Then list tools from the CLI:
+
+```bash
+cursor-agent mcp list
+```
+
+### Codex (CLI)
+
+Codex reads `~/.codex/config.toml`. Recent versions speak Streamable HTTP
+natively:
+
+```toml
+experimental_use_rmcp_client = true
+
+[mcp_servers.dbmcp]
+url = "http://localhost:3991/mcp"
+```
+
+```bash
+codex mcp list             # verify dbmcp shows up
+```
+
+### Fallback: older clients that only support stdio
+
+If a client can't talk HTTP directly, bridge stdio→HTTP with `mcp-remote`
+(this one *does* run a Node helper on the host):
+
+```jsonc
+// Claude Code / Cursor
+{ "mcpServers": { "dbmcp": {
+    "command": "npx", "args": ["-y", "mcp-remote", "http://localhost:3991/mcp"]
+} } }
+```
+
+```toml
+# Codex (~/.codex/config.toml)
+[mcp_servers.dbmcp]
+command = "npx"
+args = ["-y", "mcp-remote", "http://localhost:3991/mcp"]
+```
+
+Once connected, call `list_databases` to see available names, then `query`
+with a `database` and `sql`.
+
 ## Configuration (env)
 
 | Variable           | Default                  | Purpose                                              |
