@@ -68,6 +68,10 @@ export const config = {
 
   // Base URL callers use to fetch exported CSVs. Should be reachable from the host.
   publicBaseUrl: (process.env.PUBLIC_BASE_URL ?? "http://localhost:3991").replace(/\/+$/, ""),
+
+  // Optional bearer token. When set, every /mcp request must send
+  // `Authorization: Bearer <token>`. When empty, auth is disabled.
+  authToken: process.env.MCP_AUTH_TOKEN ?? "",
 };
 
 if (databaseNames.length === 0) {

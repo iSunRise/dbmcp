@@ -17,6 +17,10 @@ services:
       FILES_DIR: /data/files
       # Must match how the host reaches the mapped port, so CSV URLs are fetchable.
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:3991}
+      # Optional: require `Authorization: Bearer <token>` on /mcp. Empty = off.
+      MCP_AUTH_TOKEN: ${MCP_AUTH_TOKEN:-}
+      # Log verbosity: debug | info | warn | error
+      LOG_LEVEL: ${LOG_LEVEL:-info}
     volumes:
       - csv_files:/data/files
     depends_on:
