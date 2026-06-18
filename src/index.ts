@@ -10,10 +10,25 @@ import { log, errToObj } from "./logger.js";
 // Build a fresh MCP server instance. The single tool runs SQL and returns a
 // truncated preview plus a link to the full CSV export.
 function buildServer(): McpServer {
-  const server = new McpServer({
-    name: "dbmcp",
-    version: "1.0.0",
-  });
+  const server = new McpServer(
+    {
+      name: "dbmcp",
+      version: "1.0.0",
+    },
+    {
+      // Server-level guidance. MCP clients (e.g. Claude) surface this into the
+      // model's context to explain when/how to use the whole server — separate
+      // from each tool's own description.
+      instructions:
+        "Use this server when answering a question requires live data from the " +
+        `configured PostgreSQL databases (${config.databaseNames.join(", ")}). ` +
+        "Call `list_databases` first if you are unsure which database holds the " +
+        "data, then `query` with a single SELECT. Queries are intended to be " +
+        "read-only — do not run INSERT/UPDATE/DELETE/DDL. Results return as a " +
+        "truncated preview plus a public CSV URL with the full, untruncated " +
+        "result set; fetch that URL when you need rows beyond the preview.",
+    },
+  );
 
   const dbList = config.databaseNames.join(", ");
   const databaseField = config.defaultDb

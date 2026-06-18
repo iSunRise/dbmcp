@@ -57,6 +57,11 @@ export const config = {
   // Hard query timeout in milliseconds (applied both at the DB and in-process).
   queryTimeoutMs: intEnv("QUERY_TIMEOUT_MS", 30_000),
 
+  // How long an idle pooled connection lives before we close it ourselves.
+  // Keep this below the remote server's idle-session timeout so we evict stale
+  // connections before the server silently kills them.
+  idleTimeoutMs: intEnv("DB_IDLE_TIMEOUT_MS", 30_000),
+
   // Maximum size of the inline (non-CSV) response payload, in characters.
   maxOutputChars: intEnv("MAX_OUTPUT_CHARS", 1000),
 
